@@ -3,6 +3,7 @@ package com.muyundefeng.mykmeans;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.Log;
@@ -19,15 +20,14 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.GenericOptionsParser;
 
 public class KmeansDriver {
 
     /**
      * k-means algorithm program
      */
-    private static final String temp_path = "hdfs://localhost:9000/user/hadoop/date/kmeans/temp_center/";
-    private static final String dataPath = "hdfs://localhost:9000/user/hadoop/input/smallkmeansdata";
+    private static final String temp_path = "hdfs://localhost:9000/user/hadoop/kmeansData/temp_center4/";
+    private static final String dataPath = "hdfs://localhost:9000/user/hadoop/kmeansData/datas/";
     private static final int iterTime = 300;//设置最大循环次数
     private static int iterNum = 1;//表示当前的循环次数
     private static final double threadHold = 0.01;//设置相关的阈值
@@ -39,15 +39,10 @@ public class KmeansDriver {
         Configuration conf = new Configuration();
 
         // set the centers data file
-        Path centersFile = new Path("hdfs://localhost:9000/user/hadoop/input/centers");
-        DistributedCache.addCacheFile(centersFile.toUri(), conf);//存放中心向量的缓存,mapper中的setUp函数就是接受的该路径中的数据
-
-        String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-        if (otherArgs.length != 1) {
-            System.err.println("Usage: KmeansDriver <indatafile> ");
-            System.exit(2);
-        }
-        Job job = new Job(conf, "kmeans job 0");
+        Path centersFile = new Path("hdfs://localhost:9000/user/hadoop/kmeansData/center.txt");
+        //DistributedCache.addCacheFile(centersFile.toUri(), conf);//存放中心向量的缓存,mapper中的setUp函数就是接受的该路径中的数据
+        Job job = Job.getInstance(conf, "kmeans job 0");
+        job.addCacheFile(centersFile.toUri());
         job.setJarByClass(KmeansDriver.class);
         job.setMapperClass(KmeansM.class);
         job.setMapOutputKeyClass(IntWritable.class);
@@ -70,8 +65,8 @@ public class KmeansDriver {
             // set the centers data file
             //根据上面初始化的中心向量重新循环计算中心向量
             Path centersFile1 = new Path(temp_path + (iterNum - 1) + "/part-r-00000");  //  the new centers file
-            DistributedCache.addCacheFile(centersFile1.toUri(), conf1);
-            boolean iterflag = doIteration(conf1, iterNum);
+
+            boolean iterflag = doIteration(conf1, iterNum,centersFile1);
             if (!iterflag) {
                 log.error("job fails");
                 System.exit(1);
@@ -110,8 +105,7 @@ public class KmeansDriver {
         Configuration conf2 = new Configuration();
         // set the centers data file
         Path centersFile2 = new Path(temp_path + (iterNum - 1) + "/part-r-00000");  //  the new centers file
-        DistributedCache.addCacheFile(centersFile2.toUri(), conf2);
-        lastJob(conf2, iterNum);
+        lastJob(conf2, iterNum,centersFile2);
         System.out.println(iterNum);
     }
 
@@ -124,9 +118,10 @@ public class KmeansDriver {
      * @throws ClassNotFoundException
      * @throws InterruptedException
      */
-    public static boolean doIteration(Configuration conf, int iterNum) throws IOException, ClassNotFoundException, InterruptedException {
+    public static boolean doIteration(Configuration conf, int iterNum,Path centerfile) throws IOException, ClassNotFoundException, InterruptedException {
         boolean flag = false;
-        Job job = new Job(conf, "kmeans job" + " " + iterNum);
+        Job job = Job.getInstance(conf,"kmeans job"+" "+iterNum);
+        job.addCacheFile(URI.create(centerfile.toString()));
         job.setJarByClass(KmeansDriver.class);
         job.setMapperClass(KmeansM.class);
         job.setMapOutputKeyClass(IntWritable.class);
@@ -142,8 +137,9 @@ public class KmeansDriver {
         return flag;
     }
 
-    public static void lastJob(Configuration conf, int iterNum) throws IOException, ClassNotFoundException, InterruptedException {
-        Job job = new Job(conf, "kmeans job" + " " + iterNum);
+    public static void lastJob(Configuration conf, int iterNum,Path path) throws IOException, ClassNotFoundException, InterruptedException {
+        Job job = Job.getInstance(conf,"kmeans job"+" "+iterNum);
+        job.addCacheFile(URI.create(path.toString()));
         job.setJarByClass(KmeansDriver.class);
         job.setMapperClass(KmeansLastM.class);
         job.setMapOutputKeyClass(IntWritable.class);

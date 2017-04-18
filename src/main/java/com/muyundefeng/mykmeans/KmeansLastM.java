@@ -1,15 +1,16 @@
 package com.muyundefeng.mykmeans;
 
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.filecache.DistributedCache;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -31,24 +32,28 @@ public class KmeansLastM extends Mapper<LongWritable, Text, IntWritable, Text> {
     @SuppressWarnings("Duplicates")
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-        Path[] caches = DistributedCache.getLocalCacheFiles(context.getConfiguration());
+        URI[] caches = context.getCacheFiles();
         if (caches == null || caches.length <= 0) {
             log.error("center file does not exist");
             System.exit(1);
         }
         @SuppressWarnings("resource")
-        BufferedReader br = new BufferedReader(new FileReader(caches[0].toString()));
-        String line;
+        FileSystem fileSystem = FileSystem.get(caches[0],context.getConfiguration(),"hadoop");
+        FSDataInputStream inputStream = fileSystem.open(new Path(caches[0]));
+        String str1 = IOUtils.toString(inputStream);
+        String lines[]= str1.split("\\n");
         List<ArrayList<Double>> temp_centers = new ArrayList<ArrayList<Double>>();
-        ArrayList<Double> center = null;
+        ArrayList<Double> center = null;//相当一个向量
         //  get the file data
-        while ((line = br.readLine()) != null) {
+        for (int j =0;j<lines.length;j++) {
             center = new ArrayList<Double>();
-            String[] str = line.split("\t");
+            String[] str = lines[j].split("\t");
+            //	String[] str=line.split("\\s+");
             for (int i = 0; i < str.length; i++) {
                 center.add(Double.parseDouble(str[i]));
+                //	center.add((double)Float.parseFloat(str[i]));
             }
-            temp_centers.add(center);
+            temp_centers.add(center);//创建向量集
         }
         @SuppressWarnings("unchecked")
         ArrayList<Double>[] newcenters = temp_centers.toArray(new ArrayList[]{});

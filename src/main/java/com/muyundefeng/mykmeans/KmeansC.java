@@ -1,13 +1,14 @@
 package com.muyundefeng.mykmeans;
 
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
+import java.net.URI;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.filecache.DistributedCache;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -19,26 +20,17 @@ public class KmeansC extends Reducer<IntWritable,DataPro,IntWritable,DataPro> {
     private static Log log =LogFactory.getLog(KmeansC.class);
     // the main purpose of the sutup() function is to get the dimension of the original data
     @SuppressWarnings("Duplicates")
-    public void setup(Context context) throws IOException{
-        Path[] caches=DistributedCache.getLocalCacheFiles(context.getConfiguration());
+    public void setup(Context context) throws IOException, InterruptedException {
+        URI[] caches=context.getCacheFiles();
         if(caches==null||caches.length<=0){
             log.error("center file does not exist");
             System.exit(1);
         }
-        BufferedReader br=new BufferedReader(new FileReader(caches[0].toString()));
-        String line;
-        while((line=br.readLine())!=null){
-            String[] str=line.split("\t");
-            //	String[] str=line.split("\\s+");
-            dimension=str.length;
-            break;
-        }
-        try {
-            br.close();
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        FileSystem fileSystem = FileSystem.get(caches[0],context.getConfiguration(),"hadoop");
+        FSDataInputStream inputStream = fileSystem.open(new Path(caches[0]));
+        String str1 = IOUtils.toString(inputStream);
+        String str [] =str1.split("\\n")[0].split("\\t");
+        dimension = str.length;
     }
 
 
